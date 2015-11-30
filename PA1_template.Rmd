@@ -8,10 +8,28 @@ output:
 
 ## Loading and preprocessing the data
 
+```{r}
+library(data.table)
 
+unzip("activity.zip")
+activity_raw <- data.table(read.csv("activity.csv"))
+activity_raw_tidy <- activity_raw[complete.cases(activity_raw$steps),]
+dir.create("figures")
+```
 
 ## What is mean total number of steps taken per day?
+```{r}
+activity_sum_bydate <- activity_raw_tidy[,lapply(.SD, sum), by = "date"]
+activity_sum_bydate <- activity_sum_bydate[, interval:=NULL]
+par(mfrow = c(1,1))
+png(filename = "figures/stepsbyday_hist.png", width = 480, height = 480)
+hist(activity_sum_bydate$steps, col = "blue", xlab = "# of steps", 
+     main = "Steps taken each day", bty = "l")
+dev.off()
+mean_steps <- mean(activity_sum_bydate$steps)
+median_steps <- median(activity_sum_bydate$steps)
 
+```
 
 
 ## What is the average daily activity pattern?
