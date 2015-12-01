@@ -1,5 +1,6 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
+title: "Reproducible Research: Peer Assessment 1
+author: antitov
 output: 
   html_document:
     keep_md: true
@@ -9,7 +10,13 @@ output:
 ## Loading and preprocessing the data
 
 ```{r}
+Sys.setlocale("LC_TIME", "English")
 library(data.table)
+
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
 
 unzip("activity.zip")
 activity_raw <- data.table(read.csv("activity.csv"))
@@ -19,6 +26,12 @@ dir.create("figures")
 
 ## What is mean total number of steps taken per day?
 ```{r}
+#replacing na's with nil
+activity_raw_na0 <- activity_raw
+activity_raw_na0[is.na(activity_raw_na0)] <-0
+
+
+
 activity_sum_bydate <- activity_raw_tidy[,lapply(.SD, sum), by = "date"]
 activity_sum_bydate <- activity_sum_bydate[, interval:=NULL]
 par(mfrow = c(1,1))
@@ -26,6 +39,7 @@ png(filename = "figures/stepsbyday_hist.png", width = 480, height = 480)
 hist(activity_sum_bydate$steps, col = "blue", xlab = "# of steps", 
      main = "Steps taken each day", bty = "l")
 dev.off()
+#check this values
 mean_steps <- mean(activity_sum_bydate$steps)
 median_steps <- median(activity_sum_bydate$steps)
 
@@ -33,11 +47,68 @@ median_steps <- median(activity_sum_bydate$steps)
 
 
 ## What is the average daily activity pattern?
+```{r}
+activity_sum_byint <- activity_raw_tidy[,lapply(.SD, sum), by = "interval"]
+activity_sum_byint <- activity_sum_byint[, date:=NULL]
+par(mfrow = c(1,1))
+png(filename = "figures/stepsbyint_tsplot.png", width = 480, height = 480)
+#converting 5-min interval to Hours
+nice_time <- activity_sum_byint$interval
+nice_time <- lapply(nice_time, toString)
+nice_time[nchar(nice_time)<3] <- paste("00", nice_time[nchar(nice_time)<3], sep = "")
+nice_time[nchar(nice_time)<4] <- paste("0", nice_time[nchar(nice_time)<4], sep = "")
+nice_time <- substr(nice_time,1,2)
+nice_time <- as.numeric(nice_time)
+#Converting Hours value to POSIXlt format for appropriate plotting
+nice_time <- as.POSIXlt(nice_time, origin = as.POSIXct(
+    strptime("1970-01-01 00:00:00", "%Y-%m-%d %H:%M:%S", tz="Europe/Moscow")), format="%M")
+plot(nice_time, activity_sum_byint$steps, type = "l", col = "red", xlab = "5-minutes interval", ylab = "# of steps", main = "Number of steps per 5-minute interval")
+dev.off()
 
+#max steps per interval
+max_int <- activity_sum_byint$interval[activity_sum_byint$steps == (max(activity_sum_byint$steps))]
+
+```
 
 
 ## Imputing missing values
+```{r}
+#calculcating weekdays for each interval
+sum_na_steps <- sum(is.na(activity_raw$steps))
+weekdays_tidy <-  weekdays(as.POSIXlt(activity_raw_tidy$date))
 
+activity_raw_tidy_w <- activity_raw_tidy[, weekday := weekdays_tidy]
+activity_mean_byintweek <- activity_raw_tidy_w[,lapply(.SD, mean), by = "interval,weekday"]
+activity_mean_byintweek <- data.table(activity_mean_byint[, date = NULL], key = "interval")
+
+#replacing NA steps with mean by interval and weekday
+weekdays <-  weekdays(as.POSIXlt(activity_raw$date))
+activity_na_rep <- activity_raw[, weekday := weekdays]
+
+for (i in 1:length(activity_na_rep$steps)) {
+  if (is.na(activity_na_rep$steps[i])){
+    activity_na_rep$steps[i] <-
+      activity_mean_byintweek$steps[activity_na_rep$interval[i]==activity_mean_byintweek$interval &
+                                          activity_na_rep$weekday[i]==activity_mean_byintweek$weekday]
+  }
+}
+#task 1 for na replaced 
+activity_nar_sum_bydate <- activity_na_rep[,lapply(.SD, sum), by = "date"]
+activity_nar_sum_bydate <- activity_nar_sum_bydate[, interval:=NULL]
+par(mfrow = c(1,1))
+png(filename = "figures/stepsbyday_hist_nar.png", width = 480, height = 480)
+hist(activity_sum_bydate$steps, col = "blue", xlab = "# of steps", 
+     main = "Steps taken each day", bty = "l")
+dev.off()
+#mean and median for replaced
+mean_steps_nar <- mean(activity_nar_sum_bydate$steps)
+median_steps_nar <- median(activity_nar_sum_bydate$steps)
+
+
+    
+
+```
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
